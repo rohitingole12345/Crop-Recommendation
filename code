@@ -1,0 +1,120 @@
+
+# Import necessary libraries
+import pandas as pd
+from sklearn.model_selection import train_test_split
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.preprocessing import LabelEncoder
+from sklearn.metrics import accuracy_score
+import numpy as np
+
+# Load datasets
+# Replace these file paths with the actual paths to your datasets
+dataset1 = pd.read_csv('/content/Crop recommendation changed.csv')  # Crop recommendation dataset
+dataset2 = pd.read_csv('/content/3 years market values with dates .csv')  # Market trends dataset
+
+# Display first few rows of each dataset for verification
+print("Dataset 1:")
+print(dataset1.head())
+print("\nDataset 2:")
+print(dataset2.head())
+# Convert 'Arrival_Date' to datetime format and handle invalid dates
+dataset2['Arrival_Date'] = pd.to_datetime(dataset2['Arrival_Date'], errors='coerce')
+
+# Drop rows with invalid dates
+dataset2 = dataset2.dropna(subset=['Arrival_Date'])
+
+# Ensure 'Crop' and 'Variety' columns are strings
+dataset1['Crop'] = dataset1['Crop'].astype(str)
+dataset2['Crop'] = dataset2['Crop'].astype(str)
+dataset2['Variety'] = dataset2['Variety'].astype(str)
+
+# Display the cleaned dataset2
+print("Cleaned Dataset 2:")
+print(dataset2.head())
+# Combine unique crops from both datasets for encoding
+all_crops = pd.concat([dataset1['Crop'], dataset2['Crop']]).unique()
+le_crop = LabelEncoder()
+le_crop.fit(all_crops)
+
+# Encode 'Crop' in both datasets
+dataset1['Crop'] = le_crop.transform(dataset1['Crop'])
+dataset2['Crop'] = le_crop.transform(dataset2['Crop'])
+
+# Encode 'Variety' in dataset2
+le_variety = LabelEncoder()
+dataset2['Variety'] = le_variety.fit_transform(dataset2['Variety'])
+
+print("Encoding completed. Unique crops and varieties are mapped.")
+# Define features and target variable for crop recommendation
+X = dataset1[['N', 'P', 'K', 'temperature', 'humidity', 'ph', 'rainfall']]
+y = dataset1['Crop']
+
+# Split data into training and testing sets
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+
+# Train the model
+crop_model = RandomForestClassifier(random_state=42)
+crop_model.fit(X_train, y_train)
+
+# Evaluate model accuracy
+y_pred = crop_model.predict(X_test)
+accuracy = accuracy_score(y_test, y_pred)
+print(f"Crop Recommendation Model Accuracy: {accuracy * 100:.2f}%")
+def get_price_and_variety(crop_id, sowing_date):
+    target_harvest_date = sowing_date + pd.DateOffset(months=3)  # Target: 3 months after sowing
+    date_range_start = target_harvest_date - pd.Timedelta(days=7)
+    date_range_end = target_harvest_date + pd.Timedelta(days=7)
+
+    # Filter dataset2 for primary date range
+    primary_data = dataset2[
+        (dataset2['Crop'] == crop_id) &
+        (dataset2['Arrival_Date'] >= date_range_start) &
+        (dataset2['Arrival_Date'] <= date_range_end)
+    ]
+
+    if not primary_data.empty:
+        min_price = primary_data['Min_Price'].mean()
+        max_price = primary_data['Max_Price'].mean()
+        variety_id = primary_data['Variety'].mode()[0]
+        variety_name = le_variety.inverse_transform([variety_id])[0]
+        return min_price, max_price, variety_name
+
+    # Fallback logic: Search wider date range if no data found
+    fallback_data = dataset2[dataset2['Crop'] == crop_id]
+
+    if not fallback_data.empty:
+        min_price = fallback_data['Min_Price'].mean()
+        max_price = fallback_data['Max_Price'].mean()
+        variety_id = fallback_data['Variety'].mode()[0]
+        variety_name = le_variety.inverse_transform([variety_id])[0]
+        return min_price, max_price, variety_name
+
+    return None, None, None
+def recommend_crop_and_price(features, sowing_date):
+    # Predict crop
+    crop_id = crop_model.predict([features])[0]
+    crop_name = le_crop.inverse_transform([crop_id])[0]
+
+    # Get price and variety
+    min_price, max_price, variety = get_price_and_variety(crop_id, sowing_date)
+
+    if min_price is None or max_price is None or variety is None:
+        return f"No data available for crop: {crop_name} after the specified date."
+
+    return crop_name, variety, min_price, max_price
+# Example input: Features and sowing date
+features = [11, 44, 17, 26.65, 55.0, 7.9, 35.0]  # Replace with your actual input values
+sowing_date = pd.Timestamp('2024-05-19')  # Chosen sowing date
+
+# Get recommendations
+result = recommend_crop_and_price(features, sowing_date)
+
+# Display the results
+if isinstance(result, str):
+    print(result)
+else:
+    crop, variety, min_price, max_price = result
+    print(f"Recommended Crop: {crop}")
+    print(f"Recommended Variety: {variety}")
+    print(f"Expected Min Price (after harvest): ₹{min_price:.2f}")
+    print(f"Expected Max Price (after harvest): ₹{max_price:.2f}")
