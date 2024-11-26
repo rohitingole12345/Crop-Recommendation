@@ -12,7 +12,7 @@ with open('crop_recommendation_model_with_rate.pkl', 'rb') as file:
     price_model = pickle.load(file)
 
 # Load the crop rate data for displaying prices
-rate_data = pd.read_csv(r"C:\Users\LENOVO-\OneDrive\Desktop\Project 1\Datasets project 1\3 years market values with dates .csv")
+rate_data = pd.read_csv(r"./3 years market values with dates .csv")
 
 # Streamlit interface
 st.title("Crop Recommendation and Pricing System 🌱")

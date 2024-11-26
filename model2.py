@@ -3,7 +3,7 @@ from sklearn.ensemble import RandomForestClassifier
 import pickle
 
 # Load the crop rate data
-rate_data = pd.read_csv(r"C:\Users\LENOVO-\OneDrive\Desktop\Project 1\Datasets project 1\3 years market values with dates .csv")
+rate_data = pd.read_csv(r"./3 years market values with dates .csv")
 
 # Check the columns to ensure correct naming
 print(rate_data.columns)
